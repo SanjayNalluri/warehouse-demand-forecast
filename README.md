@@ -6,7 +6,7 @@
 
 ![Web app: plan page](outputs/07_web_plan.png)
 
-A UK online wholesaler ships every order from one warehouse. Each product line on an order is one pick, so daily **pick lines** decide how many pickers are needed. This project forecasts pick lines with LightGBM, tests staffing rules against six months of real orders, and serves the result through a FastAPI service and a React app.
+A UK online wholesaler ships every order from one warehouse. Each product line on an order is one pick, so daily **pick lines** decide how many pickers are needed. This project forecasts pick lines with LightGBM, tests staffing rules against six months of real orders, simulates the day hour by hour (SimPy) to choose shift times, and serves the result through a FastAPI service and a React app.
 
 **Data:** [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii): 1,067,371 order lines, 1 Dec 2009 – 9 Dec 2011 (CC BY 4.0).
 
@@ -20,6 +20,7 @@ A UK online wholesaler ships every order from one warehouse. Each product line o
 | **Uncertainty** | The 80% range (P10 – P90) contains **80%** of test days |
 | **Best staffing rule** | Staffing to the **P75** forecast: **0.9%** of lines picked late vs **6.4%** for a flat crew, for **7.7%** more labour |
 | **Cheapest rule** | Staffing to **P50**: **3% cheaper** than a flat crew *and* late lines fall from 6.4% to 2.1% |
+| **Shift timing (simulation)** | Same 6 pickers: **9.4%** of lines late on an 08 – 16 shift vs **1.7%** on a 09 – 17 / 11 – 19 split, at **6% lower** cost |
 | **Next week (9 – 15 Dec 2011)** | **33 picker-shifts** over 6 working days, ~14,359 pick lines |
 
 **Honest reading:** LightGBM beats the naive forecast clearly, but only slightly beats a simple "last year's level × this year's growth" method (22.4%). Daily orders are lumpy (about 65 wholesale orders a day, 25 lines each), so ~20% daily error is close to what this data allows. That is why the staffing plan uses the upper part of the forecast range, not the middle.
@@ -96,9 +97,40 @@ The ranking of the rules is the same for pick rates of 60, 80, 100 and 120 lines
 
 **Assumptions** (`data/raw/staffing_parameters.csv`, all flagged): pick rate 80 lines per picker-hour, 8-hour shift, 85% of the shift spent picking, overtime up to 2 hours at 1.5×. Quoted manual picking rates vary widely (one industry reference gives 60 – 400 picks/hour), so the rate is adjustable in the app and tested across a range.
 
-<!-- ARENA: section 5 (picking simulation) goes here -->
+## 5. Hour-by-hour simulation (`src/step5_simulation.py`, SimPy)
 
-## 5. API, tests and deployment
+Step 4 sets pickers per **day**, but orders arrive through the day: 16% in the 12 – 1 PM hour, 12% after 4 PM, almost none after 6 PM. A discrete-event simulation (SimPy) replays a busy forecast day, **Mon 12 Dec 2011** (P50 2,423 lines), 300 times per scenario to test **when** pickers should work.
+
+**Model:**
+- Day's total lines drawn from the forecast's own uncertainty (lognormal through P10 1,548 and P90 3,346).
+- Orders arrive as a Poisson process following the real hourly profile; each order's size is drawn from 7,346 real orders (Sep – Dec 2011, median 16 lines, max 1,112).
+- Orders over 40 lines are split into pick tasks (one cart each) so several pickers can work on one order.
+- Pickers work first-come-first-served, 80 lines/hour with random variation, 2 min set-up per task, breaks at 2, 4 and 6 hours (15 + 30 + 15 min). Work left at shift end gets up to 2 h overtime; the rest is picked the next day.
+- All scenarios use the same 300 random days, so differences come from the staffing, not luck.
+
+| Scenario (300 simulated days each) | Lines picked late | Orders done within 4 h | Overtime (h/day) | Picker utilisation | Labour cost vs all 08 – 16 |
+|---|---|---|---|---|---|
+| 6 pickers, all 08 – 16 | 9.4% | 91.5% | 5.1 | 55% | — |
+| 6 pickers, all 09 – 17 | 4.8% | 94.8% | 3.1 | 58% | −5.4% |
+| 6 pickers, all 10 – 18 | 2.6% | 96.9% | 1.8 | 61% | −9.0% |
+| 6 pickers, 3 × 08 – 16 + 3 × 10 – 18 | 3.4% | 96.1% | 4.0 | 61% | −3.1% |
+| **6 pickers, 3 × 09 – 17 + 3 × 11 – 19** | **1.7%** | 96.6% | 2.9 | 64% | **−6.1%** |
+| 5 pickers, all 10 – 18 | 4.1% | 91.9% | 3.4 | 71% | −18.9% |
+| 7 pickers, staggered 2 / 3 / 2 from 08 | 2.7% | 97.7% | 2.9 | 55% | +8.4% |
+
+95% confidence intervals are in `outputs/05_simulation_scenarios.csv` (e.g. 9.4% ± 1.0, 1.7% ± 0.5).
+
+![Simulation](outputs/05_simulation.png)
+
+**What it shows:**
+1. **Shift timing matters as much as head count.** The same 6 pickers leave 9.4% of lines to the next day on an 08 – 16 shift, because 12% of orders arrive after the crew goes home. Moving the crew to 10 – 18 cuts that to 2.6% and costs 9% less (less overtime).
+2. **Best service: split shift 3 × 09 – 17 + 3 × 11 – 19:** 1.7% late, 6% cheaper than all-early.
+3. **Timing can replace a picker:** 5 pickers on 10 – 18 (4.1% late) do better than 6 pickers on 08 – 16 (9.4%) at 19% lower cost.
+4. **The daily plan alone is optimistic:** step 4 assumes work can be done any time in the day. The simulation shows the plan needs a matching shift pattern.
+
+Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30%) are in `data/raw/simulation_parameters.csv`. An **Arena** version of the same model with the same inputs is planned as a cross-check.
+
+## 6. API, tests and deployment
 
 | Endpoint | Returns |
 |---|---|
@@ -128,6 +160,7 @@ src/step1_clean.py        clean the order lines
 src/step2_workload.py     daily + hourly workload
 src/step3_train.py        baselines vs LightGBM, MLflow, SHAP
 src/step4_staffing.py     staffing rules, next-week plan
+src/step5_simulation.py   hour-by-hour SimPy simulation of shift patterns
 src/features.py           features + closure rule (shared by training and API)
 src/forecast.py           load model, forecast, pickers (shared)
 src/tree_model.py         score the JSON model with numpy
@@ -148,6 +181,7 @@ python src/step1_clean.py          # ~1 min (reads the Excel file)
 python src/step2_workload.py
 python src/step3_train.py          # ~1 min; MLflow runs in mlflow.db
 python src/step4_staffing.py
+python src/step5_simulation.py     # ~20 s
 python -m pytest -v                # 15 tests
 
 # API
@@ -165,11 +199,11 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 - **2009 – 2011 data from one wholesaler:** results are historical patterns for this business, not current benchmarks.
 - **Pick rate and labour rules are assumptions;** the dataset has no labour data. The ranking of staffing rules holds across 60 – 120 lines/hour.
 - **The forecast under-predicts slightly** (bias −7.5% on the test months, mostly in the autumn ramp-up); staffing to P75 absorbs this.
-- **Daily level only:** the plan sets pickers per day, not per hour.
+- **Simulation simplifications:** one picking area, first-come-first-served, breaks at fixed times; packing and loading are not modelled.
 - **Test setup:** an earlier version was tested on Sep – Dec only; the monthly-retraining setup above was chosen after seeing that result. Settings were still chosen on Jan – Jun 2011 only.
 
 ---
 
-**Tech:** Python · pandas · LightGBM · MLflow · SHAP · FastAPI · pytest · Docker · GitHub Actions · React · Recharts · Vercel
+**Tech:** Python · pandas · LightGBM · MLflow · SHAP · SimPy · FastAPI · pytest · Docker · GitHub Actions · React · Recharts · Vercel
 
 **Author:** Nalluri Sanjay, B.Tech (Hons.) Industrial & Systems Engineering, IIT Kharagpur · [LinkedIn](https://www.linkedin.com/in/sanjaynalluri2405/) · [GitHub](https://github.com/SanjayNalluri)

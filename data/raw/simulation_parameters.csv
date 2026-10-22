@@ -1,0 +1,6 @@
+parameter,value,source_or_note
+task_max_lines,40,ASSUMPTION: one cart holds up to 40 order lines; bigger orders are split across carts
+task_setup_min,2,ASSUMPTION: minutes to get a cart and pick list per task
+pick_time_cv,0.3,ASSUMPTION: variability of pick time per task (coefficient of variation)
+replications,300,simulated days per scenario
+seed,42,random seed (same random days for every scenario)

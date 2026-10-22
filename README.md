@@ -1,0 +1,175 @@
+# Warehouse Demand Forecast: How Many Pickers Next Week?
+
+**Forecast a warehouse's daily picking workload 7 days ahead and turn it into a picker staffing plan, served as a live API and web app.**
+
+**Live app:** https://warehouse-demand-planner.vercel.app · **API docs:** https://warehouse-demand-api.vercel.app/docs
+
+![Web app: plan page](outputs/07_web_plan.png)
+
+A UK online wholesaler ships every order from one warehouse. Each product line on an order is one pick, so daily **pick lines** decide how many pickers are needed. This project forecasts pick lines with LightGBM, tests staffing rules against six months of real orders, and serves the result through a FastAPI service and a React app.
+
+**Data:** [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii): 1,067,371 order lines, 1 Dec 2009 – 9 Dec 2011 (CC BY 4.0).
+
+---
+
+## Results
+
+| | Result |
+|---|---|
+| **Forecast error** (Jul – Dec 2011, unseen) | Daily WAPE **22.1%** vs **25.6%** for "same weekday last week" (**14% lower**); weekly totals **13.2%** |
+| **Uncertainty** | The 80% range (P10 – P90) contains **80%** of test days |
+| **Best staffing rule** | Staffing to the **P75** forecast: **0.9%** of lines picked late vs **6.4%** for a flat crew, for **7.7%** more labour |
+| **Cheapest rule** | Staffing to **P50**: **3% cheaper** than a flat crew *and* late lines fall from 6.4% to 2.1% |
+| **Next week (9 – 15 Dec 2011)** | **33 picker-shifts** over 6 working days, ~14,359 pick lines |
+
+**Honest reading:** LightGBM beats the naive forecast clearly, but only slightly beats a simple "last year's level × this year's growth" method (22.4%). Daily orders are lumpy (about 65 wholesale orders a day, 25 lines each), so ~20% daily error is close to what this data allows. That is why the staffing plan uses the upper part of the forecast range, not the middle.
+
+---
+
+## 1. Data cleaning (`src/step1_clean.py`)
+
+| Step | Rows removed |
+|---|---|
+| 1 – 9 Dec 2010 appears in both Excel sheets | 22,523 |
+| Exact duplicate rows | 11,812 |
+| Cancellations (invoice starts with C) | 19,104 |
+| Bad-debt adjustments (invoice starts with A) | 6 |
+| Non-product codes: postage, fees, vouchers, tests (`data/raw/non_product_codes.csv`, with reasons) | 4,624 |
+| Quantity ≤ 0 (write-offs, damages) | 3,391 |
+| Price ≤ 0 | 2,571 |
+| **Kept** | **1,003,340 lines · 39,516 orders · 4,895 products** |
+
+## 2. Workload (`src/step2_workload.py`)
+
+![Daily workload](outputs/02_daily_workload.png)
+
+- **603 open days**, averaging **1,661 pick lines** (range 220 – 5,242) and **25.4 lines per order**.
+- **Closed** on Saturdays, UK bank holidays, Easter Sunday and 24 Dec – 3 Jan. This rule matches the data on **737 of 738 days**, so future open days are known in advance.
+- **Weekly pattern:** Monday busiest (1,901 lines), Sunday quietest (1,330).
+- **Seasonal pattern:** an autumn peak every year, e.g. Nov 2011 averaged **3,143** lines/day vs 1,100 – 1,500 in spring.
+- **Hourly pattern:** orders arrive 8 AM – 6 PM, peaking at 12 – 1 PM (15% of the day's lines), saved for the simulation step.
+
+![Weekday and hourly pattern](outputs/02_profiles.png)
+
+## 3. Forecast model (`src/step3_train.py`, `src/features.py`)
+
+**Features** (all at least 7 days old, so one model covers the whole week): weekday, month, week of year, days to Christmas, first day after a closure, same weekday last week, mean of the last 4 same weekdays, recent 28-day level, trend, same weekday last year, last year's level, year-on-year growth.
+
+**How it was tested**, like real use: at the start of each month the model is retrained on all earlier days, then forecasts that month 7 days ahead.
+- **Tuning months:** Jan – Jun 2011. **48 settings** compared (target type, loss, tree size), all logged in **MLflow**.
+- **Test months:** Jul – Dec 2011 (137 days, including the autumn peak), scored once.
+- Chosen: target = lines ÷ recent 28-day level, squared loss, 7 leaves, 200 trees.
+
+| Method (test months) | Daily WAPE | Bias |
+|---|---|---|
+| Naive: same weekday last week | 25.6% | −4.8% |
+| Mean of last 4 same weekdays | 25.0% | −10.7% |
+| Same weekday last year | 23.4% | −10.1% |
+| Last year's level × growth | 22.4% | −2.9% |
+| **LightGBM (tuned, retrained monthly)** | **22.1%** | −7.5% |
+
+![Test forecast](outputs/03_test_forecast.png)
+
+**80% range:** P10 and P90 are the forecast × 0.64 and × 1.38, calibrated on the tuning months only; they contain 80% of test days.
+
+**What drives the forecast (SHAP):** weekday, days to Christmas, same weekday last year, recent level, week of year.
+
+![SHAP](outputs/03_shap_importance.png)
+
+![MLflow runs](outputs/05_mlflow_runs.png)
+
+## 4. Staffing rules (`src/step4_staffing.py`)
+
+Each rule sets pickers a week ahead; the real orders then arrive. If the crew falls short, pickers do up to 2 hours of overtime; anything left is picked the next day. Labour cost counts overtime at 1.5×.
+
+| Rule (Jul – Dec 2011) | Avg pickers | Lines picked late | Days with backlog | Labour cost vs flat crew |
+|---|---|---|---|---|
+| Flat crew (4 pickers, sized on Jan – Jun busy days) | 4.0 | 6.4% | 30 | — |
+| Naive: last week's same weekday | 4.2 | 3.4% | 19 | −0.7% |
+| Forecast P50 | 4.0 | 2.1% | 14 | **−3.0%** |
+| **Forecast P75** | 4.6 | **0.9%** | 7 | +7.7% |
+| Forecast P90 | 5.4 | 0.2% | 2 | +21.7% |
+
+The ranking of the rules is the same for pick rates of 60, 80, 100 and 120 lines per hour (`outputs/04_pick_rate_sensitivity.csv`).
+
+![Staffing](outputs/04_staffing_test.png)
+
+**Assumptions** (`data/raw/staffing_parameters.csv`, all flagged): pick rate 80 lines per picker-hour, 8-hour shift, 85% of the shift spent picking, overtime up to 2 hours at 1.5×. Quoted manual picking rates vary widely (one industry reference gives 60 – 400 picks/hour), so the rate is adjustable in the app and tested across a range.
+
+<!-- ARENA: section 5 (picking simulation) goes here -->
+
+## 5. API, tests and deployment
+
+| Endpoint | Returns |
+|---|---|
+| `GET /forecast?days=7&rule=p75&pick_rate=80` | Next 1 – 7 days: pick lines P10 / P50 / P75 / P90 and pickers per day |
+| `GET /history?days=90` | Recent actual daily pick lines |
+| `GET /backtest` | Test-month forecasts, model comparison, staffing rules |
+| `GET /model-info` | Features, settings and test scores |
+| `GET /health` | Status |
+
+![API](outputs/06_api_forecast.png)
+
+- **FastAPI** with typed responses and input checks (`days` 1 – 7, `rule` p50/p75/p90, `pick_rate` > 0).
+- **No LightGBM at runtime:** the trained trees are exported to JSON and scored with numpy (`src/tree_model.py`), which keeps the serverless function small. A test confirms the predictions equal LightGBM's exactly.
+- **15 pytest tests:** no look-ahead in the features, the closure rule, every endpoint, bad inputs, JSON model = LightGBM.
+- **Docker** image and **GitHub Actions** CI: every push runs the tests, builds the image, starts it and calls `/forecast`.
+- **Deployed on Vercel:** the API as a Python function (`vercel.json`), the React + Recharts app from `web/`.
+
+![Web app: staffing rules](outputs/07_web_rules.png)
+
+---
+
+## Project structure
+
+```
+api/main.py               FastAPI app
+src/step1_clean.py        clean the order lines
+src/step2_workload.py     daily + hourly workload
+src/step3_train.py        baselines vs LightGBM, MLflow, SHAP
+src/step4_staffing.py     staffing rules, next-week plan
+src/features.py           features + closure rule (shared by training and API)
+src/forecast.py           load model, forecast, pickers (shared)
+src/tree_model.py         score the JSON model with numpy
+tests/                    pytest
+web/                      React app
+models/                   LightGBM model (.txt and .json) + model_info.json
+data/raw/                 reference CSVs (UCI Excel file not committed)
+data/processed/           daily_workload.csv
+outputs/                  results and charts
+```
+
+## Run it
+
+```bash
+# 1. Download online_retail_II.xlsx from UCI into data/raw/
+pip install -r requirements-train.txt
+python src/step1_clean.py          # ~1 min (reads the Excel file)
+python src/step2_workload.py
+python src/step3_train.py          # ~1 min; MLflow runs in mlflow.db
+python src/step4_staffing.py
+python -m pytest -v                # 15 tests
+
+# API
+uvicorn api.main:app --reload      # http://127.0.0.1:8000/docs
+
+# Web app (needs Node.js)
+cd web && npm install && npm run dev   # set VITE_API_URL in web/.env
+
+# MLflow
+mlflow ui --backend-store-uri sqlite:///mlflow.db
+```
+
+## Limitations
+
+- **2009 – 2011 data from one wholesaler:** results are historical patterns for this business, not current benchmarks.
+- **Pick rate and labour rules are assumptions;** the dataset has no labour data. The ranking of staffing rules holds across 60 – 120 lines/hour.
+- **The forecast under-predicts slightly** (bias −7.5% on the test months, mostly in the autumn ramp-up); staffing to P75 absorbs this.
+- **Daily level only:** the plan sets pickers per day, not per hour.
+- **Test setup:** an earlier version was tested on Sep – Dec only; the monthly-retraining setup above was chosen after seeing that result. Settings were still chosen on Jan – Jun 2011 only.
+
+---
+
+**Tech:** Python · pandas · LightGBM · MLflow · SHAP · FastAPI · pytest · Docker · GitHub Actions · React · Recharts · Vercel
+
+**Author:** Nalluri Sanjay, B.Tech (Hons.) Industrial & Systems Engineering, IIT Kharagpur · [LinkedIn](https://www.linkedin.com/in/sanjaynalluri2405/) · [GitHub](https://github.com/SanjayNalluri)

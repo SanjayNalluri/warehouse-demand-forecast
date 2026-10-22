@@ -32,7 +32,7 @@ export default function About() {
       </p>
 
       <h3>Built with</h3>
-      <p className="muted">Python, pandas, LightGBM, MLflow, SHAP · FastAPI, Docker, pytest, GitHub Actions · React, Recharts · Render, Vercel</p>
+      <p className="muted">Python, pandas, LightGBM, MLflow, SHAP · FastAPI, Docker, pytest, GitHub Actions · React, Recharts · Vercel (API and web app)</p>
 
       <p><a href={GITHUB}>Code on GitHub</a> · <a href={`${API}/docs`}>API documentation</a></p>
     </div>

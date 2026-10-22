@@ -11,6 +11,7 @@ from typing import Literal
 import pandas as pd
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +61,11 @@ class HistoryDay(BaseModel):
 
 
 # --- Endpoints ------------------------------------------------------------
+@app.get("/", include_in_schema=False)
+def home():
+    return RedirectResponse("/docs")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_trained_to": INFO["trained_on"][1]}

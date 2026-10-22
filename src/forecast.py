@@ -6,17 +6,18 @@ import json
 import math
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
 from features import build_features, extend_calendar, FEATURES, HORIZON
+from tree_model import TreeModel
 
 ROOT = Path(__file__).resolve().parents[1]
 MOD = ROOT / "models"
 
 
 def load_model():
-    booster = lgb.Booster(model_file=str(MOD / "lgbm_pick_lines.txt"))
+    """The model is read from its JSON export, so serving needs only numpy (no LightGBM)."""
+    model = TreeModel(MOD / "lgbm_pick_lines.json")
     info = json.loads((MOD / "model_info.json").read_text())
-    return booster, info
+    return model, info
 
 
 def load_params(path=ROOT / "data" / "raw" / "staffing_parameters.csv"):
@@ -32,14 +33,14 @@ def pickers_needed(lines, params):
     return 0 if lines <= 0 else math.ceil(lines / lines_per_picker(params))
 
 
-def forecast_next_days(daily, booster, info, horizon=HORIZON):
+def forecast_next_days(daily, model, info, horizon=HORIZON):
     """daily: history with date, is_open, lines. Returns the next `horizon` calendar days."""
     if not 1 <= horizon <= HORIZON:
         raise ValueError(f"horizon must be 1-{HORIZON} days")
     cal = extend_calendar(daily, horizon)
     f = build_features(cal)
     fut = f[f.date > daily.date.max()].copy()
-    pred = booster.predict(fut[FEATURES])
+    pred = model.predict(fut[FEATURES].values)
     if info["base_column"]:
         pred = pred * fut[info["base_column"]].values
     m = info["interval_multipliers"]

@@ -1,7 +1,8 @@
 """
 Step 3 - Forecast daily pick lines: baselines vs LightGBM, tracked in MLflow, explained with SHAP.
 Input  : data/processed/daily_workload.csv (step 2)
-Outputs: models/lgbm_pick_lines.txt     final model (trained on all data, used by the API)
+Outputs: models/lgbm_pick_lines.txt     final model (trained on all data)
+         models/lgbm_pick_lines.json    same trees as JSON, scored by the API without LightGBM
          models/model_info.json          features, settings, interval multipliers, test metrics
          outputs/03_model_comparison.csv
          outputs/03_test_predictions.csv  daily test forecasts (used by step 4)
@@ -158,6 +159,8 @@ fig.tight_layout(); fig.savefig(OUT / "03_test_forecast.png", dpi=150)
 # --- Block 5: final model on ALL data (for the API) + SHAP ---------------
 final = fit(f, best)
 final.booster_.save_model(str(MOD / "lgbm_pick_lines.txt"))
+# JSON copy of the same trees: the API scores it with numpy (src/tree_model.py)
+(MOD / "lgbm_pick_lines.json").write_text(json.dumps(final.booster_.dump_model()))
 X = f[f.date >= TEST_MONTHS[0]][FEATURES]
 sv = shap.TreeExplainer(final).shap_values(X)
 imp = pd.Series(np.abs(sv).mean(axis=0), FEATURES).sort_values()
@@ -187,4 +190,4 @@ with mlflow.start_run(run_name="final | lgbm tuned"):
         mlflow.log_artifact(str(OUT / p))
     for p in MOD.iterdir():
         mlflow.log_artifact(str(p), artifact_path="model")
-print("\nSaved models/lgbm_pick_lines.txt, models/model_info.json, outputs/03_*, MLflow runs in mlflow.db")
+print("\nSaved models/lgbm_pick_lines.txt (+ .json), models/model_info.json, outputs/03_*, MLflow runs in mlflow.db")

@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "api/main.py": {
+      "includeFiles": "{src,models,data/raw,data/processed,outputs}/**",
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/main" }]
+}

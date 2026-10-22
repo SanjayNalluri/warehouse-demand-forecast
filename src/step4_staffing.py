@@ -91,8 +91,8 @@ ax.spines[["top", "right"]].set_visible(False)
 fig.tight_layout(); fig.savefig(OUT / "04_staffing_test.png", dpi=150)
 
 # --- Block 5: plan for the next 7 days after the data ends ----------------
-booster, info = load_model()
-plan = forecast_next_days(daily, booster, info)
+model, info = load_model()
+plan = forecast_next_days(daily, model, info)
 plan["pickers_p50"] = plan.p50.apply(pickers_needed, args=(P,))
 plan["pickers_p75"] = plan.p75.apply(pickers_needed, args=(P,))
 plan["day"] = plan.date.dt.day_name()

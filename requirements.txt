@@ -1,7 +1,5 @@
-pandas
-openpyxl
-pyarrow
-matplotlib
-lightgbm
-mlflow
-shap
+# Serving only (API on Vercel / Docker). Training: requirements-train.txt
+fastapi==0.161.0
+uvicorn==0.53.0
+pandas==2.3.3
+numpy==2.3.3

@@ -2,6 +2,7 @@
 Warehouse Demand API: pick-line forecast and picker staffing for the next 1-7 days.
 Run locally : uvicorn api.main:app --reload      (from the project folder)
 Docs        : http://127.0.0.1:8000/docs
+Deployed    : as a Vercel Python function (vercel.json); also runs in Docker
 """
 import sys
 from pathlib import Path
@@ -19,7 +20,7 @@ from forecast import (load_model, load_params, forecast_next_days,  # noqa: E402
                       pickers_needed, lines_per_picker)
 
 # --- Load once at start-up ------------------------------------------------
-BOOSTER, INFO = load_model()
+MODEL, INFO = load_model()
 PARAMS = load_params()
 DAILY = pd.read_csv(ROOT / "data" / "processed" / "daily_workload.csv", parse_dates=["date"])
 OUT = ROOT / "outputs"
@@ -75,7 +76,7 @@ def forecast(days: int = Query(7, ge=1, le=HORIZON, description="Days ahead (1-7
              rule: Literal["p50", "p75", "p90"] = Query("p75", description="Forecast level used to set pickers"),
              pick_rate: float = Query(PARAMS["pick_rate"], gt=0, le=1000, description="Lines per picker-hour")):
     params = {**PARAMS, "pick_rate": pick_rate}
-    fc = forecast_next_days(DAILY, BOOSTER, INFO, horizon=days)
+    fc = forecast_next_days(DAILY, MODEL, INFO, horizon=days)
     out = [DayForecast(date=r.date.strftime("%Y-%m-%d"), weekday=r.date.day_name(), is_open=bool(r.is_open),
                        lines_p10=round(r.p10, 1), lines_p50=round(r.p50, 1), lines_p75=round(r.p75, 1),
                        lines_p90=round(r.p90, 1), pickers=pickers_needed(getattr(r, rule), params))

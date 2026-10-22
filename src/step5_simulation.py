@@ -65,8 +65,12 @@ print(f"Order size: median {np.median(SIZES):.0f}, mean {SIZES.mean():.1f} lines
 
 
 # --- Block 2: one simulated day -------------------------------------------
-def simulate(shifts, rng):
-    """shifts: list of (start_hour, n_pickers), each shift 8 h. Returns KPIs for one day."""
+def simulate(shifts, day_seed):
+    """shifts: list of (start_hour, n_pickers), each shift 8 h. Returns KPIs for one day.
+    day_seed fixes the day's demand (total lines, arrival times, order sizes) on one random
+    stream and pick times on another, so every scenario is tested on exactly the same days."""
+    rng = np.random.default_rng([day_seed, 0])        # demand
+    rng_pick = np.random.default_rng([day_seed, 1])   # pick-time variation
     env = simpy.Environment(initial_time=DAY_START)
     tasks = simpy.Store(env)
     total_lines = math.exp(rng.normal(MU, SIGMA))
@@ -76,11 +80,12 @@ def simulate(shifts, rng):
     # arrivals: draw each order's hour from the hourly profile, uniform inside the hour
     hours = rng.choice(ARR.index.values, size=n_orders, p=ARR.values / ARR.values.sum())
     times = np.sort(hours * 60 + rng.uniform(0, 60, n_orders))
+    order_sizes = rng.choice(SIZES, size=n_orders)
 
     def arrivals():
         for i, t in enumerate(times):
             yield env.timeout(max(0, t - env.now))
-            lines = int(rng.choice(SIZES))
+            lines = int(order_sizes[i])
             parts = [TASK_MAX] * (lines // TASK_MAX) + ([lines % TASK_MAX] if lines % TASK_MAX else [])
             orders[i] = {"arrive": env.now, "left": len(parts), "lines": lines, "done": None}
             for p in parts:
@@ -104,7 +109,7 @@ def simulate(shifts, rng):
                 yield env.timeout(1)
                 continue
             order_id, lines = yield tasks.get()
-            t = SETUP + lines * MIN_PER_LINE * rng.lognormal(-0.5 * math.log(1 + CV**2), math.sqrt(math.log(1 + CV**2)))
+            t = SETUP + lines * MIN_PER_LINE * rng_pick.lognormal(-0.5 * math.log(1 + CV**2), math.sqrt(math.log(1 + CV**2)))
             yield env.timeout(t)
             busy += t
             done_lines[0] += lines
@@ -127,76 +132,81 @@ def simulate(shifts, rng):
     env.process(tracer())
     env.run(until=24 * 60)
 
-    o = pd.DataFrame(orders.values())
-    late_lines = o.loc[o.done.isna(), "lines"].sum()
+    o = pd.DataFrame(orders.values(), columns=["arrive", "left", "lines", "done"])
+    late_lines = int(o.lines.sum()) - done_lines[0]        # lines not picked today (partial orders count only the unpicked part)
     cycle = (o.done - o.arrive).dropna()
-    ps = pd.DataFrame(picker_stats)
+    ps = pd.DataFrame(picker_stats, columns=["paid", "overtime", "busy"])
     paid_h, ot_h = ps.paid.sum() / 60, ps.overtime.sum() / 60
-    return {"lines": o.lines.sum(), "late_lines_pct": 100 * late_lines / o.lines.sum(),
-            "orders_same_day_pct": 100 * o.done.notna().mean(),
-            "within_4h_pct": 100 * (cycle <= 240).sum() / len(o),
+    return {"lines": o.lines.sum(), "picked_lines": done_lines[0], "late_lines": late_lines,
+            "late_lines_pct": 100 * late_lines / o.lines.sum(),
+            "orders_same_day_pct": 100 * o.done.notna().mean() if len(o) else 100.0,
+            "within_4h_pct": 100 * (cycle <= 240).sum() / max(len(o), 1),
             "mean_cycle_h": cycle.mean() / 60, "overtime_h": ot_h,
-            "utilisation_pct": 100 * ps.busy.sum() / (ps.paid.sum() + ps.overtime.sum()),
+            "utilisation_pct": 100 * ps.busy.sum() / max(ps.paid.sum() + ps.overtime.sum(), 1e-9),
             "cost_index": paid_h + P["overtime_premium"] * ot_h}, open_trace
 
 
-# --- Block 3: scenarios ---------------------------------------------------
-N_REP = int(S["replications"])
-SCENARIOS = {
-    "6 pickers, all 08-16": [(8, 6)],
-    "6 pickers, all 09-17": [(9, 6)],
-    "6 pickers, all 10-18": [(10, 6)],
-    "6 pickers, split 3 x 08-16 + 3 x 10-18": [(8, 3), (10, 3)],
-    "6 pickers, staggered 2 x 08/09/10": [(8, 2), (9, 2), (10, 2)],
-    "6 pickers, split 3 x 09-17 + 3 x 11-19": [(9, 3), (11, 3)],
-    "5 pickers, staggered 2/2/1": [(8, 2), (9, 2), (10, 1)],
-    "5 pickers, all 10-18": [(10, 5)],
-    "7 pickers, staggered 2/3/2": [(8, 2), (9, 3), (10, 2)],
-}
-rows, traces = [], {}
-for name, shifts in SCENARIOS.items():
-    rng = np.random.default_rng(int(S["seed"]))           # same random days for every scenario
-    res = []
-    for r in range(N_REP):
-        k, tr = simulate(shifts, rng)
-        res.append(k)
-        if r < 50:
-            traces.setdefault(name, []).append(tr)
-    res = pd.DataFrame(res)
-    row = {"scenario": name, "pickers": sum(n for _, n in shifts)}
-    for col in ["late_lines_pct", "orders_same_day_pct", "within_4h_pct", "mean_cycle_h", "overtime_h",
-                "utilisation_pct", "cost_index"]:
-        m, half = res[col].mean(), 1.96 * res[col].std() / math.sqrt(N_REP)   # 95% CI of the mean
-        row[col] = round(m, 2)
-        row[col + "_ci95"] = round(half, 2)
-    rows.append(row)
-out = pd.DataFrame(rows)
-base = out.loc[out.scenario == "6 pickers, all 08-16", "cost_index"].iloc[0]
-out["cost_vs_all_early_pct"] = (100 * (out.cost_index / base - 1)).round(1)
-out.to_csv(OUT / "05_simulation_scenarios.csv", index=False)
+def main():
+    # --- Block 3: scenarios ---------------------------------------------------
+    N_REP = int(S["replications"])
+    SCENARIOS = {
+        "6 pickers, all 08-16": [(8, 6)],
+        "6 pickers, all 09-17": [(9, 6)],
+        "6 pickers, all 10-18": [(10, 6)],
+        "6 pickers, split 3 x 08-16 + 3 x 10-18": [(8, 3), (10, 3)],
+        "6 pickers, staggered 2 x 08/09/10": [(8, 2), (9, 2), (10, 2)],
+        "6 pickers, split 3 x 09-17 + 3 x 11-19": [(9, 3), (11, 3)],
+        "5 pickers, staggered 2/2/1": [(8, 2), (9, 2), (10, 1)],
+        "5 pickers, all 10-18": [(10, 5)],
+        "7 pickers, staggered 2/3/2": [(8, 2), (9, 3), (10, 2)],
+    }
+    rows, traces = [], {}
+    for name, shifts in SCENARIOS.items():
+        res = []
+        for r in range(N_REP):
+            k, tr = simulate(shifts, int(S["seed"]) * 10_000 + r)   # day r is the same in every scenario
+            res.append(k)
+            if r < 50:
+                traces.setdefault(name, []).append(tr)
+        res = pd.DataFrame(res)
+        row = {"scenario": name, "pickers": sum(n for _, n in shifts)}
+        for col in ["late_lines_pct", "orders_same_day_pct", "within_4h_pct", "mean_cycle_h", "overtime_h",
+                    "utilisation_pct", "cost_index"]:
+            m, half = res[col].mean(), 1.96 * res[col].std() / math.sqrt(N_REP)   # 95% CI of the mean
+            row[col] = round(m, 2)
+            row[col + "_ci95"] = round(half, 2)
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    base = out.loc[out.scenario == "6 pickers, all 08-16", "cost_index"].iloc[0]
+    out["cost_vs_all_early_pct"] = (100 * (out.cost_index / base - 1)).round(1)
+    out.to_csv(OUT / "05_simulation_scenarios.csv", index=False)
 
-show = out[["scenario", "late_lines_pct", "within_4h_pct", "mean_cycle_h", "overtime_h", "utilisation_pct",
-            "cost_vs_all_early_pct"]]
-print(f"\n{N_REP} simulated days per scenario (same random days for each); means, 95% CI in the CSV:")
-print(show.to_string(index=False))
+    show = out[["scenario", "late_lines_pct", "within_4h_pct", "mean_cycle_h", "overtime_h", "utilisation_pct",
+                "cost_vs_all_early_pct"]]
+    print(f"\n{N_REP} simulated days per scenario (same random days for each); means, 95% CI in the CSV:")
+    print(show.to_string(index=False))
 
-# --- Block 4: chart -------------------------------------------------------
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.2))
-cols = {"6 pickers, all 08-16": "#8C2F39", "6 pickers, all 10-18": "#B8892B",
-        "6 pickers, staggered 2 x 08/09/10": "#1F3A5F"}
-for name, c in cols.items():
-    tr = np.array([[v for _, v in t] for t in traces[name]])
-    x = [t / 60 for t, _ in traces[name][0]]
-    a1.plot(x, tr.mean(axis=0), color=c, lw=2, label=name.replace("6 pickers, ", ""))
-a1.set_xlabel("Hour of day"); a1.set_ylabel("Pick lines waiting (avg of 50 days)")
-a1.set_title("Work waiting through the day, 6 pickers", loc="left", fontsize=11)
-a1.legend(fontsize=8); a1.set_xlim(6, 21)
-lab = out.scenario.str.replace(" pickers", "p").str.replace("staggered", "stag.")
-a2.barh(lab, out.late_lines_pct, xerr=out.late_lines_pct_ci95, color="#8C2F39", alpha=.85)
-a2.set_xlabel("Lines picked a day late (%), mean ± 95% CI")
-a2.set_title("Late lines by shift pattern and crew", loc="left", fontsize=11)
-a2.invert_yaxis()
-for a in (a1, a2):
-    a.spines[["top", "right"]].set_visible(False)
-fig.tight_layout(); fig.savefig(OUT / "05_simulation.png", dpi=150)
-print("\nSaved outputs/05_simulation_scenarios.csv and outputs/05_simulation.png")
+    # --- Block 4: chart -------------------------------------------------------
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.2))
+    cols = {"6 pickers, all 08-16": "#8C2F39", "6 pickers, all 10-18": "#B8892B",
+            "6 pickers, staggered 2 x 08/09/10": "#1F3A5F"}
+    for name, c in cols.items():
+        tr = np.array([[v for _, v in t] for t in traces[name]])
+        x = [t / 60 for t, _ in traces[name][0]]
+        a1.plot(x, tr.mean(axis=0), color=c, lw=2, label=name.replace("6 pickers, ", ""))
+    a1.set_xlabel("Hour of day"); a1.set_ylabel("Pick lines waiting (avg of 50 days)")
+    a1.set_title("Work waiting through the day, 6 pickers", loc="left", fontsize=11)
+    a1.legend(fontsize=8); a1.set_xlim(6, 21)
+    lab = out.scenario.str.replace(" pickers", "p").str.replace("staggered", "stag.")
+    a2.barh(lab, out.late_lines_pct, xerr=out.late_lines_pct_ci95, color="#8C2F39", alpha=.85)
+    a2.set_xlabel("Lines picked a day late (%), mean ± 95% CI")
+    a2.set_title("Late lines by shift pattern and crew", loc="left", fontsize=11)
+    a2.invert_yaxis()
+    for a in (a1, a2):
+        a.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(OUT / "05_simulation.png", dpi=150)
+    print("\nSaved outputs/05_simulation_scenarios.csv and outputs/05_simulation.png")
+
+
+if __name__ == "__main__":
+    main()

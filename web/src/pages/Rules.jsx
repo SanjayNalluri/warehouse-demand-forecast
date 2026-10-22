@@ -46,7 +46,7 @@ export default function Rules({ backtest }) {
   );
 }
 
-function Meter({ value, max, label, color, signed }) {
+export function Meter({ value, max, label, color, signed }) {
   const w = Math.max(2, (Math.abs(value) / max) * 100);
   return (
     <div className="meter">

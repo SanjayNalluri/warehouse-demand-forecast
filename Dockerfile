@@ -11,7 +11,7 @@ COPY src/features.py src/forecast.py src/tree_model.py src/
 COPY models/model_info.json models/lgbm_pick_lines.json models/
 COPY data/raw/uk_bank_holidays.csv data/raw/staffing_parameters.csv data/raw/
 COPY data/processed/daily_workload.csv data/processed/
-COPY outputs/03_test_predictions.csv outputs/03_model_comparison.csv outputs/04_staffing_policies.csv outputs/
+COPY outputs/03_test_predictions.csv outputs/03_model_comparison.csv outputs/04_staffing_policies.csv outputs/05_simulation_scenarios.csv outputs/
 
 ENV PORT=8000
 EXPOSE 8000

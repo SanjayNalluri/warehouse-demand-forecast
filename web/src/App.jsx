@@ -3,12 +3,14 @@ import { API, get } from "./api.js";
 import Plan from "./pages/Plan.jsx";
 import Accuracy from "./pages/Accuracy.jsx";
 import Rules from "./pages/Rules.jsx";
+import Shifts from "./pages/Shifts.jsx";
 import About from "./pages/About.jsx";
 
 const TABS = [
   { id: "plan", label: "Plan" },
   { id: "accuracy", label: "Accuracy" },
   { id: "rules", label: "Staffing rules" },
+  { id: "shifts", label: "Shifts" },
   { id: "about", label: "About" },
 ];
 const GITHUB = "https://github.com/SanjayNalluri/warehouse-demand-forecast";
@@ -31,8 +33,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    Promise.all([get("/history", { days: 63 }), get("/model-info"), get("/backtest")])
-      .then(([history, info, backtest]) => setShared({ history, info, backtest }))
+    Promise.all([get("/history", { days: 63 }), get("/model-info"), get("/backtest"), get("/simulation")])
+      .then(([history, info, backtest, simulation]) => setShared({ history, info, backtest, simulation }))
       .catch((e) => setError(e.message));
   }, []);
 
@@ -54,17 +56,18 @@ export default function App() {
       <main className="wrap">
         {error && (
           <div className="msg error">
-            Couldn't reach the API ({error}). The free server may still be starting, refresh in a minute,
+            Couldn't reach the API ({error}). Refresh in a moment,
             or <a href={`${API}/health`}>check it directly</a>.
           </div>
         )}
         {!shared && !error && (
-          <div className="msg">Loading data… the API runs on a free server that sleeps when idle, so the first load can take up to a minute.</div>
+          <div className="msg">Loading data… the first load can take a few seconds while the API starts.</div>
         )}
 
         {tab === "plan" && <Plan shared={shared} />}
         {tab === "accuracy" && shared && <Accuracy {...shared} />}
         {tab === "rules" && shared && <Rules {...shared} />}
+        {tab === "shifts" && shared && <Shifts {...shared} />}
         {tab === "about" && <About info={shared?.info} />}
       </main>
 

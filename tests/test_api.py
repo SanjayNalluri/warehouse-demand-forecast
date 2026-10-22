@@ -52,3 +52,9 @@ def test_history_and_backtest():
     assert len(h) == 30 and all(d["lines"] >= 0 for d in h)
     b = client.get("/backtest").json()
     assert len(b["daily"]) > 100 and len(b["staffing_rules"]) == 5
+
+
+def test_simulation_endpoint():
+    s = client.get("/simulation").json()
+    assert len(s["scenarios"]) == 9
+    assert all(0 <= r["late_lines_pct"] <= 100 for r in s["scenarios"])

@@ -100,6 +100,13 @@ def history(days: int = Query(90, ge=7, le=740, description="Calendar days of hi
             for d, o, l in zip(h.date, h.is_open, h.lines)]
 
 
+@app.get("/simulation")
+def simulation():
+    """Hour-by-hour SimPy simulation of shift patterns on a busy forecast day (Mon 12 Dec 2011)."""
+    sim = pd.read_csv(OUT / "05_simulation_scenarios.csv")
+    return {"day": "2011-12-12", "replications": 300, "scenarios": sim.to_dict(orient="records")}
+
+
 @app.get("/backtest")
 def backtest():
     """Test months (Jul - Dec 2011): daily forecast vs actual, and the staffing-rule comparison."""

@@ -21,7 +21,9 @@ export default function About() {
         <li><b>Forecast.</b> LightGBM using weekday, season, last week, last year and recent growth. All inputs are
           at least 7 days old, so one model covers the whole week. 48 settings compared in MLflow; SHAP shows weekday
           and days-to-Christmas matter most.</li>
-        <li><b>Staffing.</b> Pickers = forecast lines ÷ lines one picker does per shift, rounded up.</li>
+        <li><b>Staffing.</b> Pickers = forecast lines ÷ lines one picker does per shift, rounded up. Five rules
+          tested on Jul – Dec 2011.</li>
+        <li><b>Shifts.</b> A SimPy simulation replays a busy day hour by hour to choose when pickers should work.</li>
       </ol>
 
       <h3>Assumptions</h3>
@@ -32,7 +34,7 @@ export default function About() {
       </p>
 
       <h3>Built with</h3>
-      <p className="muted">Python, pandas, LightGBM, MLflow, SHAP · FastAPI, Docker, pytest, GitHub Actions · React, Recharts · Vercel (API and web app)</p>
+      <p className="muted">Python, pandas, LightGBM, MLflow, SHAP, SimPy · FastAPI, Docker, pytest, GitHub Actions · React, Recharts · Vercel (API and web app)</p>
 
       <p><a href={GITHUB}>Code on GitHub</a> · <a href={`${API}/docs`}>API documentation</a></p>
     </div>

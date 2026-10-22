@@ -2,7 +2,7 @@
 
 **Forecast a warehouse's daily picking workload 7 days ahead and turn it into a picker staffing plan, served as a live API and web app.**
 
-**Live app:** https://warehouse-demand-planner.vercel.app · **API docs:** https://warehouse-demand-api.vercel.app/docs
+**Live app:** https://warehouse-demand-forecast.vercel.app · **API docs:** https://warehouse-demand-api.vercel.app/docs
 
 ![Web app: plan page](outputs/07_web_plan.png)
 
@@ -20,7 +20,7 @@ A UK online wholesaler ships every order from one warehouse. Each product line o
 | **Uncertainty** | The 80% range (P10 – P90) contains **80%** of test days |
 | **Best staffing rule** | Staffing to the **P75** forecast: **0.9%** of lines picked late vs **6.4%** for a flat crew, for **7.7%** more labour |
 | **Cheapest rule** | Staffing to **P50**: **3% cheaper** than a flat crew *and* late lines fall from 6.4% to 2.1% |
-| **Shift timing (simulation)** | Same 6 pickers: **9.4%** of lines late on an 08 – 16 shift vs **1.7%** on a 09 – 17 / 11 – 19 split, at **6% lower** cost |
+| **Shift timing (simulation)** | Same 6 pickers: **9.4%** of lines late on an 08 – 16 shift vs **1.4%** on a 09 – 17 / 11 – 19 split, at **6.5% lower** cost |
 | **Next week (9 – 15 Dec 2011)** | **33 picker-shifts** over 6 working days, ~14,359 pick lines |
 
 **Honest reading:** LightGBM beats the naive forecast clearly, but only slightly beats a simple "last year's level × this year's growth" method (22.4%). Daily orders are lumpy (about 65 wholesale orders a day, 25 lines each), so ~20% daily error is close to what this data allows. That is why the staffing plan uses the upper part of the forecast range, not the middle.
@@ -106,26 +106,27 @@ Step 4 sets pickers per **day**, but orders arrive through the day: 16% in the 1
 - Orders arrive as a Poisson process following the real hourly profile; each order's size is drawn from 7,346 real orders (Sep – Dec 2011, median 16 lines, max 1,112).
 - Orders over 40 lines are split into pick tasks (one cart each) so several pickers can work on one order.
 - Pickers work first-come-first-served, 80 lines/hour with random variation, 2 min set-up per task, breaks at 2, 4 and 6 hours (15 + 30 + 15 min). Work left at shift end gets up to 2 h overtime; the rest is picked the next day.
-- All scenarios use the same 300 random days, so differences come from the staffing, not luck.
+- All scenarios use the same 300 random days (separate random streams for demand and pick times), so differences come from the staffing, not luck.
+- More pickers stop helping beyond ~6: a large crew finishes early and goes home, so the few orders arriving after 6 PM wait.
 
 | Scenario (300 simulated days each) | Lines picked late | Orders done within 4 h | Overtime (h/day) | Picker utilisation | Labour cost vs all 08 – 16 |
 |---|---|---|---|---|---|
-| 6 pickers, all 08 – 16 | 9.4% | 91.5% | 5.1 | 55% | — |
-| 6 pickers, all 09 – 17 | 4.8% | 94.8% | 3.1 | 58% | −5.4% |
-| 6 pickers, all 10 – 18 | 2.6% | 96.9% | 1.8 | 61% | −9.0% |
-| 6 pickers, 3 × 08 – 16 + 3 × 10 – 18 | 3.4% | 96.1% | 4.0 | 61% | −3.1% |
-| **6 pickers, 3 × 09 – 17 + 3 × 11 – 19** | **1.7%** | 96.6% | 2.9 | 64% | **−6.1%** |
-| 5 pickers, all 10 – 18 | 4.1% | 91.9% | 3.4 | 71% | −18.9% |
-| 7 pickers, staggered 2 / 3 / 2 from 08 | 2.7% | 97.7% | 2.9 | 55% | +8.4% |
+| 6 pickers, all 08 – 16 | 9.4% | 90.5% | 5.3 | 56% | — |
+| 6 pickers, all 09 – 17 | 4.9% | 94.5% | 3.6 | 61% | −4.6% |
+| 6 pickers, all 10 – 18 | 2.1% | 96.3% | 2.4 | 64% | −7.8% |
+| 6 pickers, 3 × 08 – 16 + 3 × 10 – 18 | 2.8% | 96.2% | 4.2 | 61% | −2.8% |
+| **6 pickers, 3 × 09 – 17 + 3 × 11 – 19** | **1.4%** | 96.9% | 2.9 | 64% | **−6.5%** |
+| 5 pickers, all 10 – 18 | 3.5% | 92.7% | 3.6 | 72% | −18.7% |
+| 7 pickers, staggered 2 / 3 / 2 from 08 | 2.1% | 97.8% | 3.2 | 55% | +8.6% |
 
-95% confidence intervals are in `outputs/05_simulation_scenarios.csv` (e.g. 9.4% ± 1.0, 1.7% ± 0.5).
+95% confidence intervals are in `outputs/05_simulation_scenarios.csv` (e.g. 9.4% ± 1.0, 1.4% ± 0.4). Late lines count only the part of an order not yet picked.
 
 ![Simulation](outputs/05_simulation.png)
 
 **What it shows:**
-1. **Shift timing matters as much as head count.** The same 6 pickers leave 9.4% of lines to the next day on an 08 – 16 shift, because 12% of orders arrive after the crew goes home. Moving the crew to 10 – 18 cuts that to 2.6% and costs 9% less (less overtime).
-2. **Best service: split shift 3 × 09 – 17 + 3 × 11 – 19:** 1.7% late, 6% cheaper than all-early.
-3. **Timing can replace a picker:** 5 pickers on 10 – 18 (4.1% late) do better than 6 pickers on 08 – 16 (9.4%) at 19% lower cost.
+1. **Shift timing matters as much as head count.** The same 6 pickers leave 9.4% of lines to the next day on an 08 – 16 shift, because 12% of orders arrive after the crew goes home. Moving the crew to 10 – 18 cuts that to 2.1% and costs 8% less (less overtime).
+2. **Best service: split shift 3 × 09 – 17 + 3 × 11 – 19:** 1.4% late, 6.5% cheaper than all-early.
+3. **Timing can replace a picker:** 5 pickers on 10 – 18 (3.5% late) do better than 6 pickers on 08 – 16 (9.4%) at 19% lower cost.
 4. **The daily plan alone is optimistic:** step 4 assumes work can be done any time in the day. The simulation shows the plan needs a matching shift pattern.
 
 Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30%) are in `data/raw/simulation_parameters.csv`. An **Arena** version of the same model with the same inputs is planned as a cross-check.
@@ -137,6 +138,7 @@ Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30
 | `GET /forecast?days=7&rule=p75&pick_rate=80` | Next 1 – 7 days: pick lines P10 / P50 / P75 / P90 and pickers per day |
 | `GET /history?days=90` | Recent actual daily pick lines |
 | `GET /backtest` | Test-month forecasts, model comparison, staffing rules |
+| `GET /simulation` | Shift-pattern simulation results |
 | `GET /model-info` | Features, settings and test scores |
 | `GET /health` | Status |
 
@@ -144,9 +146,9 @@ Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30
 
 - **FastAPI** with typed responses and input checks (`days` 1 – 7, `rule` p50/p75/p90, `pick_rate` > 0).
 - **No LightGBM at runtime:** the trained trees are exported to JSON and scored with numpy (`src/tree_model.py`), which keeps the serverless function small. A test confirms the predictions equal LightGBM's exactly.
-- **15 pytest tests:** no look-ahead in the features, the closure rule, every endpoint, bad inputs, JSON model = LightGBM.
+- **21 pytest tests:** no look-ahead in the features, the closure rule, every endpoint, bad inputs, JSON model = LightGBM, and simulation checks (every line is picked or late, same days across scenarios, more pickers help when short-staffed).
 - **Docker** image and **GitHub Actions** CI: every push runs the tests, builds the image, starts it and calls `/forecast`.
-- **Deployed on Vercel:** the API as a Python function (`vercel.json`), the React + Recharts app from `web/`.
+- **Deployed on Vercel:** the API as a Python function (`vercel.json`), the React + Recharts app from `web/` with five tabs: Plan, Accuracy, Staffing rules, Shifts (simulation), About.
 
 ![Web app: staffing rules](outputs/07_web_rules.png)
 
@@ -182,7 +184,7 @@ python src/step2_workload.py
 python src/step3_train.py          # ~1 min; MLflow runs in mlflow.db
 python src/step4_staffing.py
 python src/step5_simulation.py     # ~20 s
-python -m pytest -v                # 15 tests
+python -m pytest -v                # 21 tests
 
 # API
 uvicorn api.main:app --reload      # http://127.0.0.1:8000/docs

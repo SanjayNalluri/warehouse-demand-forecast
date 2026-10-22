@@ -1,0 +1,6 @@
+,avg_pickers,paid_hours,overtime_hours,idle_hours,days_with_overtime,days_with_backlog,late_lines_pct,cost_index,cost_vs_flat_pct
+"Flat crew (4 pickers, sized on Jan-Jun busy days)",4.0,4384.0,336.8,737.8,55.0,30.0,6.4,4889.1,0.0
+Naive: last week's same weekday,4.2,4552.0,203.5,641.4,46.0,19.0,3.4,4857.3,-0.7
+Forecast P50 (middle),4.0,4360.0,254.5,481.8,55.0,14.0,2.1,4741.8,-3.0
+Forecast P75,4.6,5072.0,128.7,918.0,31.0,7.0,0.9,5265.0,7.7
+Forecast P90 (upper end),5.4,5872.0,52.9,1499.0,10.0,2.0,0.2,5951.3,21.7

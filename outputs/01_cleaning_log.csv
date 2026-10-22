@@ -1,0 +1,9 @@
+step,rows_after,rows_removed
+Raw rows (both sheets),1067371,0
+Remove 1-9 Dec 2010 rows repeated in both sheets,1044848,22523
+Remove exact duplicate rows,1033036,11812
+Remove cancellations (invoice starts with C),1013932,19104
+Remove bad-debt adjustments (invoice starts with A),1013926,6
+"Remove non-product codes (postage, fees, vouchers, tests)",1009302,4624
+"Remove quantity <= 0 (stock write-offs, damages)",1005911,3391
+Remove price <= 0 (no sale),1003340,2571

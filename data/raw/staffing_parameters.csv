@@ -1,0 +1,6 @@
+parameter,value,unit,source_or_note
+pick_rate,80,lines per picker-hour,ASSUMPTION: published manual piece-picking rates range 60-400 picks/hour (Racklify); lines here average ~11 units so the low end is used; swept 60-120 in step 4
+shift_hours,8,hours per picker per day,ASSUMPTION: one 8-hour shift
+productive_share,0.85,share of shift spent picking,ASSUMPTION: breaks and indirect work take 15%
+overtime_premium,1.5,x normal hourly cost,ASSUMPTION: common UK overtime rate (time and a half)
+max_overtime_hours,2,hours per picker per day,ASSUMPTION: work beyond this becomes next-day backlog

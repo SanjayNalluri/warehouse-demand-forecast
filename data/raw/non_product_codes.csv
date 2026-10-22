@@ -1,0 +1,20 @@
+stock_code,description,reason
+POST,POSTAGE,shipping charge
+DOT,DOTCOM POSTAGE,shipping charge
+C2,CARRIAGE,shipping charge
+C3,(blank),shipping charge
+M,Manual,manual price adjustment
+m,Manual,manual price adjustment
+D,Discount,discount line
+S,SAMPLES,samples (not a sold product)
+B,Adjust bad debt,accounting adjustment
+ADJUST,Adjustment,accounting adjustment
+ADJUST2,Adjustment,accounting adjustment
+BANK CHARGES,Bank Charges,fee
+AMAZONFEE,AMAZON FEE,fee
+CRUK,CRUK Commission,fee
+PADS,PADS TO MATCH ALL CUSHIONS,price 0.001 filler line
+TEST001,This is a test product.,test
+TEST002,This is a test product.,test
+GIFT,(blank),gift voucher
+gift_0001_*,Dotcomgiftshop Gift Voucher,gift voucher (not picked from stock)

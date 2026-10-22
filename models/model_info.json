@@ -1,0 +1,47 @@
+{
+  "features": [
+    "dow",
+    "month",
+    "week_of_year",
+    "days_to_xmas",
+    "after_closure",
+    "lag_7",
+    "same_dow_mean_4",
+    "open_mean_28",
+    "open_mean_7_to_14",
+    "trend_28_vs_91",
+    "lag_364",
+    "last_year_mean_28",
+    "yoy_growth",
+    "expected_level"
+  ],
+  "horizon_days": 7,
+  "settings": {
+    "target": "ratio",
+    "objective": "mean",
+    "num_leaves": 7,
+    "min_child_samples": 20,
+    "n_estimators": 200
+  },
+  "base_column": "open_mean_28",
+  "trained_on": [
+    "2009-12-17",
+    "2011-12-08"
+  ],
+  "interval_multipliers": {
+    "p10": 0.6388,
+    "p75": 1.1594,
+    "p90": 1.3813
+  },
+  "test_months": [
+    "2011-07-01",
+    "2011-12-08"
+  ],
+  "test_wape": 22.12,
+  "test_bias_pct": -7.45,
+  "test_weekly_wape": 13.23,
+  "naive_wape": 25.6,
+  "best_baseline": "Last year's level x growth",
+  "best_baseline_wape": 22.36,
+  "interval_coverage_pct": 79.6
+}

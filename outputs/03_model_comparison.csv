@@ -1,0 +1,6 @@
+model,wape,mae,bias_pct
+Naive: same weekday last week,25.6,531.07,-4.85
+Mean of last 4 same weekdays,24.98,518.07,-10.66
+Same weekday last year,23.42,485.83,-10.05
+Last year's level x growth,22.36,463.74,-2.86
+"LightGBM (tuned, retrained monthly)",22.12,458.74,-7.45

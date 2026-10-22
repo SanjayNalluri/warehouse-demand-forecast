@@ -1,0 +1,8 @@
+data/raw/online_retail_II.xlsx
+data/processed/order_lines.parquet
+mlflow.db
+mlartifacts/
+mlruns/
+.git/
+__pycache__/
+*.pyc

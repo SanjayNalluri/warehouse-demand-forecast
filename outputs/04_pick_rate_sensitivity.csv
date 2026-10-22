@@ -1,0 +1,21 @@
+pick_rate,rule,cost_index,late_lines_pct,days_with_backlog
+60,Flat crew,6200,8.52,38
+60,Naive: last week's same weekday,6280,4.17,21
+60,Forecast P50 (middle),6212,2.56,16
+60,Forecast P75,6798,1.08,7
+60,Forecast P90 (upper end),7834,0.29,3
+80,Flat crew,4889,6.39,30
+80,Naive: last week's same weekday,4857,3.4,19
+80,Forecast P50 (middle),4742,2.07,14
+80,Forecast P75,5265,0.85,7
+80,Forecast P90 (upper end),5951,0.2,2
+100,Flat crew,3720,8.52,38
+100,Naive: last week's same weekday,3957,3.16,19
+100,Forecast P50 (middle),3891,2.28,12
+100,Forecast P75,4258,0.96,5
+100,Forecast P90 (upper end),4878,0.19,1
+120,Flat crew,3558,3.57,19
+120,Naive: last week's same weekday,3345,2.34,15
+120,Forecast P50 (middle),3311,1.53,11
+120,Forecast P75,3675,0.67,4
+120,Forecast P90 (upper end),4164,0.07,2

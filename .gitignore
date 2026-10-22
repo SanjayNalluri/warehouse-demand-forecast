@@ -1,0 +1,17 @@
+# Raw data (download from UCI, see README) and large intermediate file
+data/raw/online_retail_II.xlsx
+data/processed/order_lines.parquet
+
+# MLflow local store (rebuilt by step 3)
+mlflow.db
+mlartifacts/
+mlruns/
+
+# Python / editors / OS
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -8,6 +8,7 @@ Inputs : data/processed/sim_order_sizes.csv, data/processed/sim_hourly_arrivals.
          outputs/04_next_week_plan.csv, data/raw/staffing_parameters.csv,
          data/raw/simulation_parameters.csv
 Outputs: arena/arena_inputs.csv  (name, value - one row per number used in Arena)
+Note   : Arena writes e^x as EP(x).
 
 Arena clock: minutes, time 0 = 06:00 (same as SimPy).
 """
@@ -61,7 +62,7 @@ rows = [
 pd.DataFrame(rows, columns=["name", "value"]).to_csv(ROOT / "arena" / "arena_inputs.csv", index=False)
 
 print(f"Day: Mon 12 Dec 2011, P10 {day.p10:,.0f}  P50 {day.p50:,.0f}  P90 {day.p90:,.0f}")
-print(f"\nDayLines expression : EXP(NORM({mu:.5f}, {sigma:.5f}))")
+print(f"\nDayLines expression : EP(NORM({mu:.5f}, {sigma:.5f}))")
 print(f"MeanOrderSize       : {sizes.mean():.3f}   MaxShare: {max_share:.5f}")
 print(f"\nOrder size expression (mean {bin_mean:.2f} vs real {sizes.mean():.2f}):\n{size_expr}")
 print(f"\nPick time expression: {S['task_setup_min']:g} + TaskLines * {min_per_line:g} * LOGN(1, {S['pick_time_cv']:g})")

@@ -30,3 +30,6 @@ arena/*.mdb
 arena/*.Backup.doe
 arena/*.db
 arena/*.opw
+arena/*.Backup.doe
+arena/*.db
+arena/*.opw

@@ -50,6 +50,8 @@ export default function Shifts({ simulation }) {
             next day, because the crew goes home before the afternoon orders are done.</li>
           <li><b>Best service:</b> 3 pickers on 09–17 and 3 on 11–19 cut late lines to 1.4% and cost 6.5% less.</li>
           <li><b>Timing can replace a picker:</b> 5 pickers on 10–18 do better than 6 on 08–16, at 19% lower cost.</li>
+          <li><b>Checked in a second tool:</b> the same model rebuilt in Arena gives the same ranking, e.g. 9.1% vs
+            9.4% late for 08–16 and 1.5% vs 1.4% for the split shift (details in the README).</li>
         </ul>
       </div>
     </div>

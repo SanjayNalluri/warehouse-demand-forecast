@@ -6,7 +6,7 @@
 
 ![Web app: plan page](outputs/07_web_plan.png)
 
-A UK online wholesaler ships every order from one warehouse. Each product line on an order is one pick, so daily **pick lines** decide how many pickers are needed. This project forecasts pick lines with LightGBM, tests staffing rules against six months of real orders, simulates the day hour by hour (SimPy) to choose shift times, and serves the result through a FastAPI service and a React app.
+A UK online wholesaler ships every order from one warehouse. Each product line on an order is one pick, so daily **pick lines** decide how many pickers are needed. This project forecasts pick lines with LightGBM, tests staffing rules against six months of real orders, simulates the day hour by hour (SimPy, cross-checked in Arena) to choose shift times, and serves the result through a FastAPI service and a React app.
 
 **Data:** [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii): 1,067,371 order lines, 1 Dec 2009 – 9 Dec 2011 (CC BY 4.0).
 
@@ -129,7 +129,25 @@ Step 4 sets pickers per **day**, but orders arrive through the day: 16% in the 1
 3. **Timing can replace a picker:** 5 pickers on 10 – 18 (3.5% late) do better than 6 pickers on 08 – 16 (9.4%) at 19% lower cost.
 4. **The daily plan alone is optimistic:** step 4 assumes work can be done any time in the day. The simulation shows the plan needs a matching shift pattern.
 
-Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30%) are in `data/raw/simulation_parameters.csv`. An **Arena** version of the same model with the same inputs is planned as a cross-check.
+Simulation assumptions (cart size 40 lines, 2 min set-up, pick-time variation 30%) are in `data/raw/simulation_parameters.csv`.
+
+### 5b. Cross-check in Arena (`arena/`, `src/step6_arena_inputs.py`, `src/step7_arena_compare.py`)
+
+The same model was rebuilt in **Rockwell Arena** (Student edition), so that the shift-pattern results do not depend on one piece of code. `step6_arena_inputs.py` turns the SimPy inputs into the numbers typed into Arena (`arena/arena_inputs.csv`): the same lognormal day total, hourly arrival profile, order sizes (17 bins, mean 28.7 vs 28.8 lines), cart size, pick time and breaks. Each scenario was run for 300 days; the reports are in `arena/results/`.
+
+![Arena model](outputs/08_arena_model.png)
+
+| Scenario (300 days each) | Lines picked late: Arena | Lines picked late: SimPy |
+|---|---|---|
+| 6 pickers, all 08 – 16 | 9.1% ± 1.0 | 9.4% ± 1.0 |
+| 6 pickers, all 10 – 18 | 3.0% ± 0.8 | 2.1% ± 0.5 |
+| 6 pickers, 3 × 09 – 17 + 3 × 11 – 19 | 1.5% ± 0.6 | 1.4% ± 0.4 |
+| 5 pickers, all 10 – 18 | 3.7% ± 1.0 | 3.5% ± 0.8 |
+| 7 pickers, staggered 2 / 3 / 2 from 08 | 2.1% ± 0.6 | 2.1% ± 0.4 |
+
+- **The two models agree:** every pair of 95% confidence intervals overlaps, the scenario ranking is the same (correlation 0.994), and both pick the 09 – 17 / 11 – 19 split as the best pattern.
+- **Overtime differs** (Arena 0.9 – 1.6 h/day lower): in Arena the whole crew starts each break at the fixed time; in SimPy each picker first finishes the current cart. Overtime is therefore only compared between scenarios inside one model.
+- **Student-edition limit:** Arena Student allows 150 entities at once. A day ends early if more than 120 carts are waiting; this happened on 1 – 4 of 300 days per scenario (the busiest ~1% of days, e.g. 4,911 lines vs a P50 of 2,423). These days are counted in `outputs/07_arena_vs_simpy.csv`.
 
 ## 6. API, tests and deployment
 
@@ -163,6 +181,9 @@ src/step2_workload.py     daily + hourly workload
 src/step3_train.py        baselines vs LightGBM, MLflow, SHAP
 src/step4_staffing.py     staffing rules, next-week plan
 src/step5_simulation.py   hour-by-hour SimPy simulation of shift patterns
+src/step6_arena_inputs.py inputs for the Arena model
+src/step7_arena_compare.py Arena vs SimPy comparison
+arena/                    Arena model (.doe), its inputs and the 5 scenario reports
 src/features.py           features + closure rule (shared by training and API)
 src/forecast.py           load model, forecast, pickers (shared)
 src/tree_model.py         score the JSON model with numpy
@@ -184,6 +205,8 @@ python src/step2_workload.py
 python src/step3_train.py          # ~1 min; MLflow runs in mlflow.db
 python src/step4_staffing.py
 python src/step5_simulation.py     # ~20 s
+python src/step6_arena_inputs.py   # numbers for the Arena model
+python src/step7_arena_compare.py  # after running the scenarios in Arena
 python -m pytest -v                # 21 tests
 
 # API
@@ -201,11 +224,11 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db
 - **2009 – 2011 data from one wholesaler:** results are historical patterns for this business, not current benchmarks.
 - **Pick rate and labour rules are assumptions;** the dataset has no labour data. The ranking of staffing rules holds across 60 – 120 lines/hour.
 - **The forecast under-predicts slightly** (bias −7.5% on the test months, mostly in the autumn ramp-up); staffing to P75 absorbs this.
-- **Simulation simplifications:** one picking area, first-come-first-served, breaks at fixed times; packing and loading are not modelled.
+- **Simulation simplifications:** one picking area, first-come-first-served, breaks at fixed times; packing and loading are not modelled. The Arena cross-check uses the Student edition, so the busiest ~1% of days are cut short.
 - **Test setup:** an earlier version was tested on Sep – Dec only; the monthly-retraining setup above was chosen after seeing that result. Settings were still chosen on Jan – Jun 2011 only.
 
 ---
 
-**Tech:** Python · pandas · LightGBM · MLflow · SHAP · SimPy · FastAPI · pytest · Docker · GitHub Actions · React · Recharts · Vercel
+**Tech:** Python · pandas · LightGBM · MLflow · SHAP · SimPy · Arena · FastAPI · pytest · Docker · GitHub Actions · React · Recharts · Vercel
 
 **Author:** Nalluri Sanjay, B.Tech (Hons.) Industrial & Systems Engineering, IIT Kharagpur · [LinkedIn](https://www.linkedin.com/in/sanjaynalluri2405/) · [GitHub](https://github.com/SanjayNalluri)

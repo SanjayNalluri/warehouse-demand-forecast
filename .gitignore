@@ -15,3 +15,15 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Arena run files (rebuilt on every run; scenario reports are kept in arena/results/)
+arena/*.p
+arena/*.out
+arena/*.err
+arena/*.lis
+arena/*.exp
+arena/*.mod
+arena/*.dsn
+arena/*_rpt.xlsm
+arena/*.accdb
+arena/*.mdb

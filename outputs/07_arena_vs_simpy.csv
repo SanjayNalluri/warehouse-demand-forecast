@@ -1,0 +1,6 @@
+scenario,replications,days_cut_short,arena_late_pct,arena_late_ci95,arena_late_pct_full_days,simpy_late_pct,simpy_late_ci95,arena_overtime_h,simpy_overtime_h,arena_mean_lines,late_diff_pts,cis_overlap
+"6 pickers, all 08-16",300,1,9.12,0.95,8.99,9.43,0.98,4.34,5.28,2364.0,-0.31,True
+"6 pickers, all 10-18",300,4,2.96,0.84,2.2,2.08,0.45,1.11,2.37,2306.0,0.88,True
+"6 pickers, split 3 x 09-17 + 3 x 11-19",300,1,1.53,0.59,1.29,1.36,0.42,1.75,2.86,2302.0,0.17,True
+"5 pickers, all 10-18",300,4,3.67,1.02,2.8,3.53,0.77,2.08,3.63,2313.0,0.14,True
+"7 pickers, staggered 2/3/2",300,1,2.14,0.57,1.94,2.09,0.4,2.23,3.16,2303.0,0.05,True

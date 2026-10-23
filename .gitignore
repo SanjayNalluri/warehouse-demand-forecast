@@ -27,3 +27,6 @@ arena/*.dsn
 arena/*_rpt.xlsm
 arena/*.accdb
 arena/*.mdb
+arena/*.Backup.doe
+arena/*.db
+arena/*.opw
